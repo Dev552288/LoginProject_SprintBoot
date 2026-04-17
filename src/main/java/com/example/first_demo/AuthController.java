@@ -1,6 +1,7 @@
 package com.example.first_demo;
 import com.example.first_demo.model.ApiResponse;
 import com.example.first_demo.model.LoginRequest;
+import com.example.first_demo.model.SignUpRequest;
 import com.example.first_demo.model.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,5 +33,31 @@ public class AuthController {
                     .body(new ApiResponse(false,"Wrong password"));
         }
         return ResponseEntity.ok(new ApiResponse(true, "Login Successful"));
+    }
+
+    @PostMapping("/signup")
+    public ResponseEntity<ApiResponse> signUp (@RequestBody SignUpRequest signUpRequest){
+        if (userRepository.findByUsername(signUpRequest.getUsername()).isPresent()){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false,"Username already exists"));
+        }
+
+        if (userRepository.findByEmail(signUpRequest.getEmail()).isPresent()){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false,"Email already exists"));
+        }
+
+        User user = new User();
+        user.setUsername(signUpRequest.getUsername());
+        user.setPassword(signUpRequest.getPassword());
+        user.setEmail(signUpRequest.getEmail());
+        user.setMobileNumber(signUpRequest.getMobileNumber());
+        user.setDob(signUpRequest.getDob());
+        user.setName(signUpRequest.getName());
+
+        userRepository.save(user);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(new ApiResponse(true, "User Created"));
     }
 }
