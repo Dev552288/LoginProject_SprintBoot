@@ -1,8 +1,10 @@
-package com.example.first_demo;
+package com.example.first_demo.api;
+import com.example.first_demo.repo.UserRepository;
 import com.example.first_demo.model.ApiResponse;
 import com.example.first_demo.model.LoginRequest;
 import com.example.first_demo.model.SignUpRequest;
 import com.example.first_demo.model.User;
+import com.example.first_demo.security.JwtUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,7 +34,9 @@ public class AuthController {
                     .status(HttpStatus.UNAUTHORIZED)
                     .body(new ApiResponse(false,"Wrong password"));
         }
-        return ResponseEntity.ok(new ApiResponse(true, "Login Successful"));
+        String token = JwtUtil.generateToken(userData.getUsername());
+
+        return ResponseEntity.ok(new ApiResponse(true, "Login Successful", token));
     }
 
     @PostMapping("/signup")
@@ -60,4 +64,21 @@ public class AuthController {
                 .status(HttpStatus.CREATED)
                 .body(new ApiResponse(true, "User Created"));
     }
+
+
+    @GetMapping("/profile")
+    public ResponseEntity<ApiResponse> getProfile(
+            @RequestHeader("Authorization") String authHeader
+    ){
+        try {
+            String token = authHeader.replace("Bearer","");
+            String userName = JwtUtil.validateToken(token);
+
+            return ResponseEntity.ok(new ApiResponse(true, "Welcome", userName));
+
+        }catch (Exception e){
+            return ResponseEntity.ok(new ApiResponse(false, "Invalid Token"));
+        }
+    }
+
 }
