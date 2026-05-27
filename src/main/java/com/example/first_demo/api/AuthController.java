@@ -73,12 +73,9 @@ public class AuthController {
         try {
             String token = authHeader.replace("Bearer","");
             String userName = JwtUtil.validateToken(token);
-
             return ResponseEntity.ok(new ApiResponse(true, "Welcome", userName));
-
         }catch (Exception e){
             return ResponseEntity.ok(new ApiResponse(false, "Invalid Token"));
         }
     }
-
 }
