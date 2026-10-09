@@ -8,6 +8,9 @@ import com.example.first_demo.security.JwtUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -21,13 +24,15 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse> login(@RequestBody LoginRequest loginRequest) {
-            Optional<User> user = userRepository.findByUsername(loginRequest.getUsername());
+            Optional<User> user
+                    = userRepository.findByUsername(loginRequest.getUsername());
         if (user.isEmpty()){
 
             return ResponseEntity
                     .status(HttpStatus.NOT_FOUND)
                     .body(new ApiResponse(false, "User not found"));
         }
+
         User userData = user.get();
         if (!userData.getPassword().equals(loginRequest.getPassword())) {
             return ResponseEntity
@@ -66,7 +71,7 @@ public class AuthController {
     }
 
 
-    @GetMapping("/profile")
+    @PostMapping("/profile")
     public ResponseEntity<ApiResponse> getProfile(
             @RequestHeader("Authorization") String authHeader
     ){
@@ -79,4 +84,52 @@ public class AuthController {
         }
     }
 
+
+    @PostMapping("/dashboard")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getDashboard(
+            @RequestHeader("Authorization") String authHeader
+    ) {
+        try {
+            // 1. Cleanly extract token whether "Bearer " is present or not
+            String token = authHeader;
+            if (token != null && token.toLowerCase().startsWith("bearer ")) {
+                token = token.substring(7);
+            }
+            token = token.trim(); // Removes leading/trailing spaces
+
+            // 2. Validate Token
+            String userName = JwtUtil.validateToken(token);
+
+            // 3. Find User
+            Optional<User> user = userRepository.findByUsername(userName);
+            if (user.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.error("User not found"));
+            }
+
+            User userData = user.get();
+            Map<String, Object> map = new HashMap<>();
+
+            // 4. Safely populate user info (Map.of throws NullPointerException if any value is null!)
+            Map<String, Object> userInfo = new HashMap<>();
+            userInfo.put("name", userData.getName() != null ? userData.getName() : "");
+            userInfo.put("email", userData.getEmail() != null ? userData.getEmail() : "");
+            userInfo.put("username", userData.getUsername());
+
+            map.put("userInfo", userInfo);
+            map.put("status", Map.of(
+                    "totalTasks", 12,
+                    "pendingActions", 3,
+                    "notificationsCount", 5
+            ));
+
+            return ResponseEntity.ok(ApiResponse.success("Dashboard data retrieved successfully", map));
+
+        } catch (Exception e) {
+            // Print exception in backend console to see the exact root cause
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Invalid Token: " + e.getMessage()));
+        }
+    }
 }
