@@ -1,10 +1,8 @@
 package com.example.first_demo.api;
+import com.example.first_demo.model.*;
 import com.example.first_demo.repo.UserRepository;
-import com.example.first_demo.model.ApiResponse;
-import com.example.first_demo.model.LoginRequest;
-import com.example.first_demo.model.SignUpRequest;
-import com.example.first_demo.model.User;
 import com.example.first_demo.security.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -39,9 +37,22 @@ public class AuthController {
                     .status(HttpStatus.UNAUTHORIZED)
                     .body(new ApiResponse(false,"Wrong password"));
         }
-        String token = JwtUtil.generateToken(userData.getUsername());
+        // Generate Access Token
+        String accessToken   = JwtUtil.generateAccessToken(userData.getUsername());
 
-        return ResponseEntity.ok(new ApiResponse(true, "Login Successful", token));
+        // Generate Refresh Token
+        String refreshToken =
+                JwtUtil.generateRefreshToken(userData.getUsername());
+
+        // Prepare response
+        Map<String, Object> response = new HashMap<>();
+
+        response.put("accessToken", accessToken);
+        response.put("refreshToken", refreshToken);
+        response.put("tokenType", "Bearer");
+        response.put("expiresIn", 900);
+
+        return ResponseEntity.ok(new ApiResponse(true, "Login Successful", response));
     }
 
     @PostMapping("/signup")
@@ -124,12 +135,66 @@ public class AuthController {
             ));
 
             return ResponseEntity.ok(ApiResponse.success("Dashboard data retrieved successfully", map));
-
         } catch (Exception e) {
             // Print exception in backend console to see the exact root cause
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error("Invalid Token: " + e.getMessage()));
         }
     }
+
+    @PostMapping("/refreshToken")
+    public ResponseEntity<?> refreshToken(
+            @RequestBody RefreshTokenRequest request) {
+
+        try {
+
+            String refreshToken = request.getRefreshToken();
+
+            if (refreshToken == null || refreshToken.isBlank()) {
+                return ResponseEntity.badRequest()
+                        .body(new ApiResponse(false,
+                                "Refresh token is required"));
+            }
+
+            // Validate refresh token
+            String username =
+                    JwtUtil.validateRefreshToken(refreshToken);
+
+            // Check user
+            Optional<User> user =
+                    userRepository.findByUsername(username);
+
+            if (user.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ApiResponse(false, "User not found"));
+            }
+
+            // Generate new access token
+            String newAccessToken =
+                    JwtUtil.generateAccessToken(username);
+
+            Map<String, Object> response = new HashMap<>();
+
+            response.put("accessToken", newAccessToken);
+            response.put("tokenType", "Bearer");
+            response.put("expiresIn", 900);
+
+            return ResponseEntity.ok(
+                    new ApiResponse(
+                            true,
+                            "Token refreshed successfully",
+                            response
+                    )
+            );
+
+        } catch (Exception e) {
+
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(
+                            false,
+                            "Invalid or expired refresh token"
+                    ));
+        }
+    }
+
 }
